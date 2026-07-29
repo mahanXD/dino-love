@@ -5,20 +5,22 @@ import math
 import json
 import os
 
-# ---------- راه‌اندازی ----------
-pygame.init()
-pygame.mixer.init()
-
-# ---------- پیدا کردن مسیر ----------
+# ---------- پیدا کردن مسیر (پشتیبانی از exe و py) ----------
 if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
+    # اجرا از فایل exe - فایل‌ها از پوشه موقت (MEIPASS) خوانده می‌شوند
+    BASE_DIR = sys._MEIPASS
 else:
+    # اجرا از فایل py معمولی
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-PIC_DIR = os.path.join(BASE_DIR, "pic")
-SOUND_DIR = os.path.join(BASE_DIR, "sound")
-SAVE_FILE = os.path.join(BASE_DIR, "save.json")
+# مسیر پوشه‌های داده (همان پوشه کنار exe برای ذخیره سیو و صدا/تصویر در حالت معمولی)
+DATA_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else BASE_DIR
 
+PIC_DIR = os.path.join(DATA_DIR, "pic")
+SOUND_DIR = os.path.join(DATA_DIR, "sound")
+SAVE_FILE = os.path.join(DATA_DIR, "save.json")
+
+# ساخت پوشه‌ها اگر وجود ندارند (برای حالت غیر exe)
 os.makedirs(PIC_DIR, exist_ok=True)
 os.makedirs(SOUND_DIR, exist_ok=True)
 
@@ -108,38 +110,64 @@ BASE_SPEED = current_settings["base_speed"]
 MAX_SPEED = current_settings["max_speed"]
 TARGET_DISTANCE = current_settings["target_distance"]
 
-# ---------- کلاس مدیریت Assets ----------
+# ---------- کلاس مدیریت Assets (با پشتیبانی از مسیرهای مختلف) ----------
 class AssetManager:
     images = {}
     sounds = {}
 
     @staticmethod
+    def get_base_dir():
+        """برگرداندن مسیر پایه برای فایل‌های embedded"""
+        if getattr(sys, 'frozen', False):
+            return sys._MEIPASS
+        return os.path.dirname(os.path.abspath(__file__))
+
+    @staticmethod
     def load_image(name):
         if name in AssetManager.images:
             return AssetManager.images[name]
-        path = os.path.join(PIC_DIR, name + ".png")
-        try:
-            img = pygame.image.load(path).convert_alpha()
-            AssetManager.images[name] = img
-            return img
-        except:
-            AssetManager.images[name] = None
-            return None
+        
+        # ابتدا از پوشه اصلی (کنار exe) امتحان کن
+        path_main = os.path.join(DATA_DIR, "pic", name + ".png")
+        # سپس از پوشه embedded (داخل exe) امتحان کن
+        path_embedded = os.path.join(AssetManager.get_base_dir(), "pic", name + ".png")
+        
+        paths_to_try = [path_main, path_embedded]
+        
+        for path in paths_to_try:
+            try:
+                if os.path.exists(path):
+                    img = pygame.image.load(path).convert_alpha()
+                    AssetManager.images[name] = img
+                    return img
+            except:
+                pass
+        
+        AssetManager.images[name] = None
+        return None
 
     @staticmethod
     def load_sound(name):
         if name in AssetManager.sounds:
             return AssetManager.sounds[name]
+        
         extensions = [".wav", ".mp3", ".ogg", ".wav.mp3", ".mp3.wav"]
+        
         for ext in extensions:
-            path = os.path.join(SOUND_DIR, name + ext)
-            if os.path.exists(path):
+            # ابتدا از پوشه اصلی (کنار exe)
+            path_main = os.path.join(DATA_DIR, "sound", name + ext)
+            # سپس از پوشه embedded (داخل exe)
+            path_embedded = os.path.join(AssetManager.get_base_dir(), "sound", name + ext)
+            
+            for path in [path_main, path_embedded]:
                 try:
-                    sound = pygame.mixer.Sound(path)
-                    AssetManager.sounds[name] = sound
-                    return sound
+                    if os.path.exists(path):
+                        sound = pygame.mixer.Sound(path)
+                        AssetManager.sounds[name] = sound
+                        return sound
                 except:
                     pass
+        
         AssetManager.sounds[name] = None
         return None
 
@@ -407,7 +435,7 @@ def draw_text(text, font, color, x, y, center=False):
         rect.topleft = (x, y)
     screen.blit(img, rect)
 
-# ---------- کات‌سین (پس‌زمینه سبز) ----------
+# ---------- کات‌سین ----------
 def draw_cutscene(step, timer):
     screen.fill(LIGHT_GREEN)
 
@@ -484,7 +512,7 @@ def draw_cutscene(step, timer):
         dead_dino.y = HEIGHT - 100
         dead_dino.draw(screen, dead=True)
 
-# ---------- صفحه Game Over با انتخاب Difficulty ----------
+# ---------- صفحه Game Over ----------
 def draw_game_over_screen():
     screen.fill((30, 30, 30))
     
