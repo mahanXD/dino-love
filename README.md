@@ -5,22 +5,23 @@ import math
 import json
 import os
 
-# ---------- پیدا کردن مسیر (پشتیبانی از exe و py) ----------
+# ---------- راه‌اندازی ----------
+pygame.init()
+pygame.mixer.init()
+pygame.font.init()  # ← این خط جدید
+
+# ---------- پیدا کردن مسیر ----------
 if getattr(sys, 'frozen', False):
-    # اجرا از فایل exe - فایل‌ها از پوشه موقت (MEIPASS) خوانده می‌شوند
     BASE_DIR = sys._MEIPASS
 else:
-    # اجرا از فایل py معمولی
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# مسیر پوشه‌های داده (همان پوشه کنار exe برای ذخیره سیو و صدا/تصویر در حالت معمولی)
 DATA_DIR = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else BASE_DIR
 
 PIC_DIR = os.path.join(DATA_DIR, "pic")
 SOUND_DIR = os.path.join(DATA_DIR, "sound")
 SAVE_FILE = os.path.join(DATA_DIR, "save.json")
 
-# ساخت پوشه‌ها اگر وجود ندارند (برای حالت غیر exe)
 os.makedirs(PIC_DIR, exist_ok=True)
 os.makedirs(SOUND_DIR, exist_ok=True)
 
@@ -110,14 +111,13 @@ BASE_SPEED = current_settings["base_speed"]
 MAX_SPEED = current_settings["max_speed"]
 TARGET_DISTANCE = current_settings["target_distance"]
 
-# ---------- کلاس مدیریت Assets (با پشتیبانی از مسیرهای مختلف) ----------
+# ---------- کلاس مدیریت Assets ----------
 class AssetManager:
     images = {}
     sounds = {}
 
     @staticmethod
     def get_base_dir():
-        """برگرداندن مسیر پایه برای فایل‌های embedded"""
         if getattr(sys, 'frozen', False):
             return sys._MEIPASS
         return os.path.dirname(os.path.abspath(__file__))
@@ -127,14 +127,10 @@ class AssetManager:
         if name in AssetManager.images:
             return AssetManager.images[name]
         
-        # ابتدا از پوشه اصلی (کنار exe) امتحان کن
         path_main = os.path.join(DATA_DIR, "pic", name + ".png")
-        # سپس از پوشه embedded (داخل exe) امتحان کن
         path_embedded = os.path.join(AssetManager.get_base_dir(), "pic", name + ".png")
         
-        paths_to_try = [path_main, path_embedded]
-        
-        for path in paths_to_try:
+        for path in [path_main, path_embedded]:
             try:
                 if os.path.exists(path):
                     img = pygame.image.load(path).convert_alpha()
@@ -154,9 +150,7 @@ class AssetManager:
         extensions = [".wav", ".mp3", ".ogg", ".wav.mp3", ".mp3.wav"]
         
         for ext in extensions:
-            # ابتدا از پوشه اصلی (کنار exe)
             path_main = os.path.join(DATA_DIR, "sound", name + ext)
-            # سپس از پوشه embedded (داخل exe)
             path_embedded = os.path.join(AssetManager.get_base_dir(), "sound", name + ext)
             
             for path in [path_main, path_embedded]:
